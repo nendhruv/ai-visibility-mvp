@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 250, 250, 250;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-inter), system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-blue-500;
+  }
+  
+  .btn-primary {
+    @apply bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium 
+           hover:bg-indigo-700 transition-colors duration-200 
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-indigo-600 px-6 py-3 rounded-lg font-medium 
+           border border-indigo-200 hover:border-indigo-300 
+           hover:bg-indigo-50 transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-start-rgb));
+}
+
+input, textarea {
+  @apply border-gray-300 rounded-md shadow-sm;
+}
+
+button {
+  @apply transition-colors duration-200;
+} 
