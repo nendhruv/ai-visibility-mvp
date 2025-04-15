@@ -154,6 +154,16 @@ export default function Dashboard() {
     }
   }, [companyData?.aiVisibility]);
 
+  // Log prompt and response data
+  useEffect(() => {
+    if (companyData) {
+      console.log("Dashboard data for PromptAnalysis:", {
+        promptResponsesCount: companyData.aiVisibility?.promptResponses?.length || 0,
+        industryPromptCount: companyData.industryPrompts?.length || 0,
+        industryPrompts: companyData.industryPrompts
+      });
+    }
+  }, [companyData]);
 
   // Show loading spinner while data is being fetched
   if (loading) {

@@ -30,10 +30,18 @@ export default function PromptAnalysis({
   showPosition = true,
   showLastScanned = true
 }: PromptAnalysisProps) {
-  const [selectedModel, setSelectedModel] = useState<string>('all')
-  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null)
-  const [selectedSentiment, setSelectedSentiment] = useState<string>('all')
-  const [selectedScanTime, setSelectedScanTime] = useState<string | null>(null)
+  console.log("PromptAnalysis rendering");
+  
+  // First calculate default scanTimes to use in state initialization
+  // This ensures we ALWAYS have a default tab selected
+  const today = new Date().toISOString();
+  
+  // IMPORTANT: Initialize with first tab selected by default
+  // Using today's date ensures there's always a value
+  const [selectedScanTime, setSelectedScanTime] = useState(today);
+  const [selectedModel, setSelectedModel] = useState<string>('all');
+  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
+  const [selectedSentiment, setSelectedSentiment] = useState<string>('all');
 
   // Group responses by scan time
   const groupResponsesByScanTime = (responses: PromptResponse[]) => {
@@ -70,41 +78,84 @@ export default function PromptAnalysis({
 
   // Get unique scan times for tabs
   const scanTimes = useMemo(() => {
-    const groups = groupResponsesByScanTime(responses);
-    const sortedTimes = Object.keys(groups).sort((a, b) => 
-      new Date(b).getTime() - new Date(a).getTime()
-    );
-
-    // Get the latest scan time
-    const latestScanTime = sortedTimes[0];
+    // Always include today as a fallback option
+    const today = new Date();
+    const todayStr = today.toISOString();
     
-    // Generate the next 7 days of dates
-    const next7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() + i + 1); // Start from tomorrow
-      return date.toISOString();
-    });
+    let result;
+    
+    // If there are no responses, just return today
+    if (responses.length === 0) {
+      const next6Days = Array.from({ length: 6 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() + i + 1);
+        return date.toISOString();
+      });
+      result = [todayStr, ...next6Days];
+    } else {
+      // Group existing responses by scan time
+      const groups = groupResponsesByScanTime(responses);
+      const sortedTimes = Object.keys(groups).sort((a, b) => 
+        new Date(b).getTime() - new Date(a).getTime()
+      );
+      
+      // Get the latest scan time and upcoming dates
+      const latestScanTime = sortedTimes[0] || todayStr;
+      const next6Days = Array.from({ length: 6 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() + i + 1);
+        return date.toISOString();
+      });
+      
+      result = [latestScanTime, ...next6Days];
+    }
+    
+    // Force update the selected tab if necessary
+    setTimeout(() => {
+      if (result.length > 0 && (!selectedScanTime || !result.includes(selectedScanTime))) {
+        setSelectedScanTime(result[0]);
+      }
+    }, 0);
+    
+    return result;
+  }, [responses, selectedScanTime]);
 
-    // Combine the latest scan time with the next 7 days
-    return [latestScanTime, ...next7Days].filter(Boolean);
-  }, [responses]);
-
-  // Set the latest scan time as selected by default
+  // Always force select the first tab if none is selected
   useEffect(() => {
-    if (scanTimes.length > 0 && !selectedScanTime) {
+    // Force selection of the first tab regardless of current state
+    if (scanTimes.length > 0) {
       setSelectedScanTime(scanTimes[0]);
     }
-  }, [scanTimes, selectedScanTime]);
+  }, [scanTimes]); // Only depend on scanTimes to ensure it runs when data changes
+
+  // Use layout effect to ensure selection happens before the browser paints
+  React.useLayoutEffect(() => {
+    console.log("Layout effect running, selectedScanTime:", selectedScanTime);
+    if (scanTimes.length > 0) {
+      console.log("Setting scan time to:", scanTimes[0]);
+      setSelectedScanTime(scanTimes[0]);
+    }
+  }, [scanTimes]); // Run this effect whenever scanTimes changes
 
   const scanTimeGroups = groupResponsesByScanTime(responses);
 
   // Get responses for the selected scan time
   const getResponsesForSelectedTime = () => {
+    console.log("Getting responses for time:", selectedScanTime);
+    console.log("Current filters - Model:", selectedModel, "Prompt:", selectedPrompt, "Sentiment:", selectedSentiment);
+    console.log("Available industry prompts:", industryPrompts.map(p => p.query));
+    
     if (!selectedScanTime) {
       return [];
     }
     const groups = groupResponsesByScanTime(responses);
-    const scanTimeResponses = groups[selectedScanTime] || [];
+    let scanTimeResponses = groups[selectedScanTime] || [];
+    
+    // If no scan time responses exist but we have responses, show all responses
+    if (scanTimeResponses.length === 0 && responses.length > 0) {
+      console.log("No responses for this scan time, showing all responses");
+      scanTimeResponses = responses;
+    }
     
     // Apply filters to the responses
     return scanTimeResponses.filter(response => {
@@ -113,7 +164,7 @@ export default function PromptAnalysis({
         return false;
       }
       
-      // Filter by prompt
+      // Filter by prompt - only apply if a prompt is actually selected
       if (selectedPrompt && response.prompt !== selectedPrompt) {
         return false;
       }
@@ -285,8 +336,12 @@ export default function PromptAnalysis({
             <div className="relative">
               <select
                 value={selectedPrompt || ''}
-                onChange={(e) => setSelectedPrompt(e.target.value || null)}
+                onChange={(e) => {
+                  console.log("Prompt changed to:", e.target.value);
+                  setSelectedPrompt(e.target.value || null);
+                }}
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm pl-3 pr-10 py-2 appearance-none"
+                defaultValue=""
               >
                 <option value="">All Prompts</option>
                 {industryPrompts.map(prompt => (
@@ -341,12 +396,13 @@ export default function PromptAnalysis({
                 onClick={() => !isFuture && setSelectedScanTime(timeStr)}
                 className={`${
                   isSelected
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 border-b-2 !important'
                     : isFuture
                     ? 'border-transparent text-gray-400 cursor-not-allowed'
                     : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-3 px-2 border-b-2 font-medium text-sm flex items-center`}
                 disabled={isFuture}
+                style={isSelected ? { borderBottomWidth: '2px', borderBottomColor: '#3b82f6' } : {}}
               >
                 <span className="mr-2">{formatScanTime(timeStr)}</span>
                 {!isFuture && (
@@ -395,8 +451,8 @@ export default function PromptAnalysis({
           <tbody className="bg-white divide-y divide-gray-200">
             {getResponsesForSelectedTime().map((response: PromptResponse, index: number) => (
               <tr key={index} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-5 text-sm font-medium text-gray-900 max-w-[250px]">
-                  <div className="truncate" title={response.prompt}>
+                <td className="px-6 py-5 text-sm font-medium text-gray-900">
+                  <div className="break-words max-h-20 overflow-y-auto" title={response.prompt}>
                     {response.prompt}
                   </div>
                 </td>
@@ -466,12 +522,20 @@ export default function PromptAnalysis({
             ))}
             {getResponsesForSelectedTime().length === 0 && (
               <tr>
-                <td colSpan={showPosition && showLastScanned ? 7 : showPosition || showLastScanned ? 6 : 5} className="px-6 py-10 text-center text-sm text-gray-500 bg-gray-50">
-                  <div className="flex flex-col items-center justify-center space-y-3">
-                    <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <td colSpan={showPosition && showLastScanned ? 7 : showPosition || showLastScanned ? 6 : 5} className="px-6 py-12 text-center text-sm text-gray-500 bg-gray-50">
+                  <div className="flex flex-col items-center justify-center space-y-4">
+                    <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 13a4 4 0 100-8 4 4 0 000 8z" />
                     </svg>
-                    <p>No responses found</p>
+                    <div className="text-center">
+                      <p className="text-base font-medium text-gray-600 mb-1">No data available</p>
+                      <p className="text-sm text-gray-500 mb-4">There are no visibility reports available for this time period.</p>
+                      {responses.length === 0 && (
+                        <p className="text-sm text-gray-600">
+                          Try running a visibility scan to see how your brand appears in AI responses.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </td>
               </tr>
