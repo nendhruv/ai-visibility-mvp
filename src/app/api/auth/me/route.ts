@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import connectDB from '@/lib/db'
 import { User } from '@/models/User'
-import { store } from '@/lib/store'
+import { Company } from '@/models/Company'
 import { JWT_SECRET } from '@/lib/config'
 
 export const runtime = 'nodejs'
@@ -13,14 +13,23 @@ export async function GET() {
     const token = cookies().get('auth-token')?.value
     
     if (!token) {
+      console.log('No auth-token cookie found')
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     let decoded;
     try {
+      console.log('Attempting to verify token with JWT_SECRET')
       decoded = jwt.verify(token, JWT_SECRET) as { userId: string, email: string }
+      console.log('Token verification successful')
     } catch (error) {
-      console.error('Token verification error:', error)
+      console.error('Token verification error details:', {
+        error,
+        tokenLength: token.length,
+        secretLength: JWT_SECRET.length,
+        secretFirstChar: JWT_SECRET.charAt(0),
+        secretLastChar: JWT_SECRET.charAt(JWT_SECRET.length - 1)
+      })
       return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 })
     }
 
@@ -33,7 +42,15 @@ export async function GET() {
       }
 
       // Check if the user has company data (has analyzed)
-      const hasAnalyzed = store.getCompanyData() !== null
+      let hasAnalyzed = false
+      try {
+        const company = await Company.findOne({ userId: user._id })
+        hasAnalyzed = !!company
+      } catch (err) {
+        console.error('Error checking company data:', err)
+        // Default to false if there's an error
+        hasAnalyzed = false
+      }
 
       return NextResponse.json({
         user: {

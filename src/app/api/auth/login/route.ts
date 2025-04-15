@@ -5,6 +5,7 @@ import connectDB from '@/lib/db'
 import { User } from '@/models/User'
 import { store } from '@/lib/store'
 import { JWT_SECRET } from '@/lib/config'
+import { Company } from '@/models/Company'
 
 export const runtime = 'nodejs'
 
@@ -39,8 +40,17 @@ export async function POST(request: Request) {
       { expiresIn: '7d' }
     )
 
-    // Check if user has already analyzed (has company data)
-    const hasAnalyzed = store.getCompanyData() !== null
+    // Check if user has analyzed (has company data)
+    // Try to find company data for this user instead of relying on in-memory store
+    let hasAnalyzed = false
+    try {
+      const company = await Company.findOne({ userId: user._id })
+      hasAnalyzed = !!company
+    } catch (err) {
+      console.error('Error checking company data:', err)
+      // Default to false if there's an error
+      hasAnalyzed = false
+    }
 
     // Create the response
     const response = NextResponse.json({
@@ -59,7 +69,7 @@ export async function POST(request: Request) {
       name: 'auth-token',
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_URL?.startsWith('https'),
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',
