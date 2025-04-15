@@ -1,1 +1,1 @@
-export const JWT_SECRET = process.env.JWT_SECRET
+export const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key-for-development-only"

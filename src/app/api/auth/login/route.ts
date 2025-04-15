@@ -32,10 +32,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create JWT token
+    // Create JWT token - ensure JWT_SECRET is definitely a string
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email },
-      JWT_SECRET,
+      JWT_SECRET as string,
       { expiresIn: '7d' }
     )
 

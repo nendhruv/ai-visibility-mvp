@@ -82,10 +82,24 @@ export class AITrackingService {
       ];
       
       await AIModel.insertMany(defaultModels);
-      return await AIModel.find({ active: true }).lean();
+      const newModels = await AIModel.find({ active: true }).lean();
+      
+      // Transform MongoDB documents to match AIModel interface
+      return newModels.map(model => ({
+        id: String(model._id),
+        name: String(model.name || ''),
+        provider: String(model.provider || ''),
+        active: Boolean(model.active)
+      }));
     }
     
-    return models;
+    // Transform MongoDB documents to match AIModel interface
+    return models.map(model => ({
+      id: String(model._id),
+      name: String(model.name || ''),
+      provider: String(model.provider || ''),
+      active: Boolean(model.active)
+    }));
   }
 
   /**
@@ -158,8 +172,8 @@ export class AITrackingService {
     }).sort({ createdAt: -1 }).lean();
     
     let brandMentionsChange;
-    if (previousResult && typeof previousResult.brandMentions === 'number') {
-      const previous = previousResult.brandMentions;
+    if (previousResult && typeof (previousResult as any).brandMentions === 'number') {
+      const previous = (previousResult as any).brandMentions;
       if (previous > 0) {
         brandMentionsChange = Math.round(((brandMentions - previous) / previous) * 100);
       }
@@ -423,12 +437,12 @@ export class AITrackingService {
     
     // Get frequency for the tracking config
     const config = await TrackingConfig.findById(result.trackingConfigId).lean();
-    const frequency = config?.frequency || 'weekly';
+    const frequency = (config as any)?.frequency || 'weekly';
     
     // Update the tracking config with the last run time
     await TrackingConfig.findByIdAndUpdate(result.trackingConfigId, {
       lastRun: result.timestamp,
-      nextRun: this.calculateNextRunTime(frequency),
+      nextRun: this.calculateNextRunTime(frequency as 'daily' | 'weekly' | 'monthly'),
       updatedAt: new Date()
     });
   }

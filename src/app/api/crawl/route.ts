@@ -142,6 +142,7 @@ Return them in this exact JSON format:
         success: true,
         domain,
         brand,
+        rawText,
         companyDescription,
         industry,
         industryPrompts,
